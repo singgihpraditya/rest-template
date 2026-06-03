@@ -1,5 +1,6 @@
 package com.example.template.config;
 
+import com.example.template.security.DynamicAuthorizationManager;
 import com.example.template.security.JwtAccessDeniedHandler;
 import com.example.template.security.JwtAuthenticationEntryPoint;
 import com.example.template.security.JwtAuthenticationFilter;
@@ -7,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -23,27 +23,22 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 /**
  * Konfigurasi Spring Security.
- * Menggunakan JWT stateless (tidak ada session).
+ *
+ * ATURAN OTORISASI sekarang bersifat DINAMIS — dibaca dari tabel endpoint_permissions di DB
+ * via DynamicAuthorizationManager, bukan hardcoded di sini.
+ *
+ * Untuk menambah/mengubah/menghapus aturan akses: gunakan endpoint /api/permissions (ADMIN only).
  */
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity  // Mengaktifkan @PreAuthorize, @PostAuthorize di level method
+@EnableMethodSecurity  // Mengaktifkan @PreAuthorize sebagai safety net (misal di EndpointPermissionController)
 @RequiredArgsConstructor
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
-
-    // URL yang boleh diakses tanpa token
-    private static final String[] PUBLIC_URLS = {
-            "/api/auth/**",
-            "/v3/api-docs/**",
-            "/swagger-ui/**",
-            "/swagger-ui.html",
-            "/h2-console/**",
-            "/actuator/health"
-    };
+    private final DynamicAuthorizationManager dynamicAuthorizationManager;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -65,18 +60,10 @@ public class SecurityConfig {
                         .accessDeniedHandler(jwtAccessDeniedHandler)           // 403
                 )
 
-                // Aturan otorisasi per endpoint
+                // Semua aturan otorisasi dikelola oleh DynamicAuthorizationManager (dari DB)
+                // Untuk mengubah akses endpoint: gunakan /api/permissions (tanpa restart)
                 .authorizeHttpRequests(auth -> auth
-                        // URL publik
-                        .requestMatchers(PUBLIC_URLS).permitAll()
-                        // GET endpoints yang boleh diakses tanpa login
-                        .requestMatchers(HttpMethod.GET,
-                                "/api/products/**",
-                                "/api/categories/**",
-                                "/api/external/**"   // demo feign client, data publik dari JSONPlaceholder
-                        ).permitAll()
-                        // Semua request lainnya harus authenticated
-                        .anyRequest().authenticated()
+                        .anyRequest().access(dynamicAuthorizationManager)
                 )
 
                 // Pasang JWT filter sebelum UsernamePasswordAuthenticationFilter
@@ -95,19 +82,8 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 
-    /**
-     * Mencegah Spring Boot mendaftarkan JwtAuthenticationFilter secara otomatis
-     * ke servlet filter chain (karena @Component).
-     *
-     * KENAPA DIBUTUHKAN?
-     * JwtAuthenticationFilter adalah @Component, sehingga Spring Boot secara otomatis
-     * mendaftarkannya ke servlet filter chain DAN kita juga mendaftarkannya secara eksplisit
-     * ke Spring Security chain via addFilterBefore(). Tanpa ini, filter berjalan dua kali:
-     *   1. Di servlet chain (redundant, sebelum Security chain selesai)
-     *   2. Di Spring Security chain (yang benar, di dalam SecurityFilterChain)
-     *
-     * Dengan setEnabled(false), filter HANYA berjalan di dalam Spring Security chain.
-     */
+    // Mencegah JwtAuthenticationFilter terdaftar dua kali:
+    // sekali di Spring Security chain (addFilterBefore) dan sekali di servlet chain (karena @Component)
     @Bean
     public FilterRegistrationBean<JwtAuthenticationFilter> jwtFilterRegistration(JwtAuthenticationFilter filter) {
         FilterRegistrationBean<JwtAuthenticationFilter> registration = new FilterRegistrationBean<>(filter);

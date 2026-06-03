@@ -17,6 +17,18 @@
       "value": "",
       "type": "string",
       "description": "JWT token - otomatis terisi setelah request Login"
+    },
+    {
+      "key": "new_permission_id",
+      "value": "",
+      "type": "string",
+      "description": "ID permission rule - otomatis terisi setelah request Tambah Rule Baru"
+    },
+    {
+      "key": "uploaded_filename",
+      "value": "",
+      "type": "string",
+      "description": "Nama file - otomatis terisi setelah request Upload File"
     }
   ],
   "item": [
@@ -896,6 +908,243 @@
               "path": ["api", "external", "posts", "user", "1"]
             },
             "description": "Ambil semua posts berdasarkan userId dari JSONPlaceholder."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Permission Management",
+      "description": "Kelola aturan otorisasi endpoint secara dinamis dari DB.\nSemua request membutuhkan token ROLE_ADMIN (login sebagai admin terlebih dahulu).\n\nPerubahan langsung berlaku tanpa restart aplikasi.",
+      "item": [
+        {
+          "name": "List Semua Rules",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Output berupa array', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.output_schema).to.be.an('array');",
+                  "    pm.expect(json.output_schema.length).to.be.above(0);",
+                  "    console.log('Total rules:', json.output_schema.length);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/permissions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "permissions"]
+            },
+            "description": "Tampilkan semua rule otorisasi yang aktif, diurutkan berdasarkan sort_order."
+          }
+        },
+        {
+          "name": "Detail Rule by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Rule ada', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.output_schema.id).to.be.a('number');",
+                  "    pm.expect(json.output_schema.url_pattern).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/permissions/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "permissions", "1"]
+            },
+            "description": "Ambil detail satu rule berdasarkan ID."
+          }
+        },
+        {
+          "name": "Tambah Rule Baru",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Rule terbuat', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.output_schema.id).to.be.a('number');",
+                  "    pm.collectionVariables.set('new_permission_id', json.output_schema.id);",
+                  "    console.log('New permission ID:', json.output_schema.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"http_method\": \"GET\",\n  \"url_pattern\": \"/api/orders/**\",\n  \"required_role\": \"ROLE_USER\",\n  \"sort_order\": 50,\n  \"active\": true,\n  \"description\": \"Baca order (user yang login)\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/permissions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "permissions"]
+            },
+            "description": "Buat rule baru.\n\nField:\n- `http_method`: GET | POST | PUT | DELETE | PATCH | * (semua method)\n- `url_pattern`: Ant-style pattern, misal `/api/orders/**`\n- `required_role`: ROLE_ADMIN | ROLE_USER | kosong/null (publik)\n- `sort_order`: angka lebih kecil = dicek lebih dulu (lebih prioritas)\n- `active`: true | false\n\nPerubahan berlaku LANGSUNG tanpa restart."
+          }
+        },
+        {
+          "name": "Update Rule (Ubah Role)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Role terupdate', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.output_schema.required_role).to.eql('ROLE_ADMIN');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"http_method\": \"GET\",\n  \"url_pattern\": \"/api/orders/**\",\n  \"required_role\": \"ROLE_ADMIN\",\n  \"sort_order\": 50,\n  \"active\": true,\n  \"description\": \"Baca order - diubah ke ROLE_ADMIN\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/permissions/{{new_permission_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "permissions", "{{new_permission_id}}"]
+            },
+            "description": "Update rule yang sudah ada. Jalankan setelah 'Tambah Rule Baru' agar `new_permission_id` terisi.\n\nContoh use case:\n- Ubah endpoint dari ROLE_ADMIN ke ROLE_USER (atau sebaliknya)\n- Nonaktifkan rule dengan `active: false`\n- Ubah sortOrder untuk mengubah prioritas pencocokan"
+          }
+        },
+        {
+          "name": "Nonaktifkan Rule (active: false)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Rule dinonaktifkan', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.output_schema.active).to.eql(false);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"http_method\": \"GET\",\n  \"url_pattern\": \"/api/orders/**\",\n  \"required_role\": \"ROLE_USER\",\n  \"sort_order\": 50,\n  \"active\": false,\n  \"description\": \"[NONAKTIF] Baca order\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/permissions/{{new_permission_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "permissions", "{{new_permission_id}}"]
+            },
+            "description": "Nonaktifkan rule tanpa menghapusnya (`active: false`).\nRule tidak akan dicek oleh DynamicAuthorizationManager tapi data tetap tersimpan di DB."
+          }
+        },
+        {
+          "name": "Hapus Rule",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Error code RST-000', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.error_schema.error_code).to.eql('RST-000');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/permissions/{{new_permission_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "permissions", "{{new_permission_id}}"]
+            },
+            "description": "Hapus rule permanen. Cache otomatis di-refresh setelah delete.\nJalankan setelah 'Tambah Rule Baru' agar `new_permission_id` terisi."
+          }
+        },
+        {
+          "name": "Refresh Cache Manual",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Cache refreshed', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.error_schema.error_code).to.eql('RST-000');",
+                  "    console.log('Cache berhasil di-refresh');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/permissions/refresh",
+              "host": ["{{base_url}}"],
+              "path": ["api", "permissions", "refresh"]
+            },
+            "description": "Paksa reload semua rules dari DB ke in-memory cache.\n\nKapan digunakan:\n- Setelah perubahan langsung di DB (bukan via API)\n- Jika ada inkonsistensi antara DB dan cache\n\nNormal usage: cache di-refresh otomatis setiap ada perubahan via API."
           }
         }
       ]

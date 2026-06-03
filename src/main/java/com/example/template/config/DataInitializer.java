@@ -2,6 +2,7 @@ package com.example.template.config;
 
 import com.example.template.entity.*;
 import com.example.template.repository.*;
+import com.example.template.service.EndpointPermissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -35,6 +36,8 @@ public class DataInitializer implements CommandLineRunner {
     private final CategoryRepository categoryRepository;
     private final TagRepository tagRepository;
     private final ProductRepository productRepository;
+    private final EndpointPermissionRepository endpointPermissionRepository;
+    private final EndpointPermissionService endpointPermissionService;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -144,7 +147,71 @@ public class DataInitializer implements CommandLineRunner {
                 .tags(Set.of(programming))
                 .build());
 
+        // 6. Seed permission rules
+        seedPermissions();
+
         log.info("Inisialisasi data selesai!");
         log.info("Login credentials: admin/admin123 | user/user123");
+        log.info("Kelola permission di: GET /api/permissions");
+    }
+
+    /**
+     * Seed aturan otorisasi ke tabel endpoint_permissions.
+     * sortOrder lebih kecil = lebih prioritas (dicek lebih dulu).
+     * requiredRole null/kosong = endpoint publik (tidak butuh login).
+     */
+    private void seedPermissions() {
+        if (endpointPermissionRepository.count() > 0) {
+            return;
+        }
+
+        Object[][] rules = {
+            // sortOrder | httpMethod | urlPattern                  | requiredRole | description
+            // --- Endpoint selalu publik (sistem) ---
+            {  1, "*",    "/error",                       null,          "Error handler Spring Boot" },
+            {  2, "*",    "/api/auth/**",                 null,          "Login & register (publik)" },
+            {  3, "*",    "/v3/api-docs/**",              null,          "Swagger API docs" },
+            {  4, "*",    "/swagger-ui/**",               null,          "Swagger UI" },
+            {  5, "*",    "/swagger-ui.html",             null,          "Swagger UI HTML" },
+            {  6, "*",    "/h2-console/**",               null,          "H2 Console (local only)" },
+            {  7, "GET",  "/actuator/health",             null,          "Health check" },
+            {  8, "GET",  "/files/**",                    null,          "Static file access" },
+
+            // --- Endpoint publik (read only) ---
+            {  10, "GET", "/api/products/**",             null,          "Baca produk (publik)" },
+            {  11, "GET", "/api/categories/**",           null,          "Baca kategori (publik)" },
+            {  12, "GET", "/api/external/**",             null,          "Demo Feign Client (publik)" },
+
+            // --- Hanya ADMIN ---
+            {  20, "POST",   "/api/categories",           "ROLE_ADMIN",  "Buat kategori baru" },
+            {  21, "PUT",    "/api/categories/**",        "ROLE_ADMIN",  "Update kategori" },
+            {  22, "DELETE", "/api/categories/**",        "ROLE_ADMIN",  "Hapus kategori" },
+            {  23, "POST",   "/api/products",             "ROLE_ADMIN",  "Buat produk baru" },
+            {  24, "PUT",    "/api/products/**",          "ROLE_ADMIN",  "Update produk" },
+            {  25, "DELETE", "/api/products/**",          "ROLE_ADMIN",  "Hapus produk" },
+            {  26, "*",      "/api/permissions/**",       "ROLE_ADMIN",  "Kelola permission (ADMIN)" },
+
+            // --- User yang sudah login (role apapun) ---
+            {  30, "*",      "/api/files/**",             "ROLE_USER",   "Upload/download file" },
+            {  31, "GET",    "/api/auth/me",              "ROLE_USER",   "Get current user info" },
+
+            // --- Default fallback: wajib login ---
+            { 999, "*",      "/api/**",                   "ROLE_USER",   "Default: semua /api/** wajib login" },
+        };
+
+        for (Object[] r : rules) {
+            endpointPermissionRepository.save(EndpointPermission.builder()
+                    .sortOrder((Integer) r[0])
+                    .httpMethod((String) r[1])
+                    .urlPattern((String) r[2])
+                    .requiredRole((String) r[3])
+                    .description((String) r[4])
+                    .active(true)
+                    .build());
+        }
+
+        // Refresh cache setelah semua rule disimpan
+        endpointPermissionService.refresh();
+        log.info("Permission rules berhasil di-seed: {} rules", rules.length);
     }
 }
