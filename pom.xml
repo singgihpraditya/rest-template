@@ -137,12 +137,24 @@
         </dependency>
 
         <!-- ==================== DISTRIBUTED TRACING (OpenTelemetry) ==================== -->
-        <!-- Bridge Micrometer Tracing → OpenTelemetry SDK (cukup ini untuk traceId di MDC) -->
-        <!-- opentelemetry-exporter-otlp TIDAK dibutuhkan kecuali ada OTel Collector yang berjalan -->
+        <!-- Bridge Micrometer Tracing → OpenTelemetry SDK. Cukup ini untuk traceId di log. -->
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-tracing-bridge-otel</artifactId>
         </dependency>
+
+        <!--
+            OPSIONAL: Export trace ke OTel Collector (Jaeger / Grafana Tempo / Zipkin).
+            Aktifkan dengan uncomment dependency ini + set endpoint di application-local.properties.
+            Jalankan collector dulu: docker-compose up -d
+            Jika tidak ada collector, dependency ini akan menyebabkan error log koneksi.
+        -->
+        <!--
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+        </dependency>
+        -->
 
         <!-- ==================== FEIGN CLIENT ==================== -->
         <!-- Spring Cloud OpenFeign untuk memanggil REST API eksternal -->

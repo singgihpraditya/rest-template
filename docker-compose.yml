@@ -1,0 +1,37 @@
+# ============================================================
+# Docker Compose untuk Observability Stack (Development Only)
+# ============================================================
+#
+# Jalankan: docker-compose up -d
+# Hentikan: docker-compose down
+#
+# PRASYARAT sebelum menjalankan aplikasi dengan Jaeger:
+#   1. Uncomment dependency di pom.xml:
+#      <dependency>
+#          <groupId>io.opentelemetry</groupId>
+#          <artifactId>opentelemetry-exporter-otlp</artifactId>
+#      </dependency>
+#   2. Uncomment di application-local.properties:
+#      management.otlp.tracing.endpoint=http://localhost:4318/v1/traces
+#   3. Jalankan: docker-compose up -d
+#   4. Jalankan aplikasi: mvn spring-boot:run -Dspring-boot.run.profiles=local
+#   5. Buka Jaeger UI: http://localhost:16686
+
+services:
+
+  # ----------------------------------------------------------
+  # Jaeger: Distributed Tracing UI
+  # UI     : http://localhost:16686
+  # OTLP HTTP receiver : http://localhost:4318/v1/traces
+  # OTLP gRPC receiver : http://localhost:4317
+  # ----------------------------------------------------------
+  jaeger:
+    image: jaegertracing/all-in-one:1.54
+    container_name: rest-template-jaeger
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4317:4317"     # OTLP gRPC
+      - "4318:4318"     # OTLP HTTP (dipakai aplikasi)
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    restart: unless-stopped
