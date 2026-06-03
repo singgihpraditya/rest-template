@@ -70,6 +70,8 @@ Format `LocalDateTime`: `"yyyy-MM-dd HH:mm:ss"` (misal: `"2024-01-15 10:30:00"`)
 
 ## Konfigurasi Utama (application.properties)
 - Buat 3 profile : local, dev dan prod
+- URL publik (tanpa token): `/api/auth/**`, `/api/products/**` (GET), `/api/categories/**` (GET), `/api/external/**` (GET), Swagger, H2 console
+- `JwtAuthenticationFilter` hanya dijalankan di Spring Security chain (bukan dua kali); dikontrol via `FilterRegistrationBean` di `SecurityConfig`
 - Port: 8080
 - DB: 
 	* H2 in-memory (jdbc:h2:mem:logitrackdb), ddl-auto: create-drop, untuk env local

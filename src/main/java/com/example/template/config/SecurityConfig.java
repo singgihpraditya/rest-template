@@ -4,6 +4,7 @@ import com.example.template.security.JwtAccessDeniedHandler;
 import com.example.template.security.JwtAuthenticationEntryPoint;
 import com.example.template.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -68,8 +69,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // URL publik
                         .requestMatchers(PUBLIC_URLS).permitAll()
-                        // GET products dan categories boleh tanpa login
-                        .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**").permitAll()
+                        // GET endpoints yang boleh diakses tanpa login
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/products/**",
+                                "/api/categories/**",
+                                "/api/external/**"   // demo feign client, data publik dari JSONPlaceholder
+                        ).permitAll()
                         // Semua request lainnya harus authenticated
                         .anyRequest().authenticated()
                 )
@@ -88,5 +93,25 @@ public class SecurityConfig {
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
+    }
+
+    /**
+     * Mencegah Spring Boot mendaftarkan JwtAuthenticationFilter secara otomatis
+     * ke servlet filter chain (karena @Component).
+     *
+     * KENAPA DIBUTUHKAN?
+     * JwtAuthenticationFilter adalah @Component, sehingga Spring Boot secara otomatis
+     * mendaftarkannya ke servlet filter chain DAN kita juga mendaftarkannya secara eksplisit
+     * ke Spring Security chain via addFilterBefore(). Tanpa ini, filter berjalan dua kali:
+     *   1. Di servlet chain (redundant, sebelum Security chain selesai)
+     *   2. Di Spring Security chain (yang benar, di dalam SecurityFilterChain)
+     *
+     * Dengan setEnabled(false), filter HANYA berjalan di dalam Spring Security chain.
+     */
+    @Bean
+    public FilterRegistrationBean<JwtAuthenticationFilter> jwtFilterRegistration(JwtAuthenticationFilter filter) {
+        FilterRegistrationBean<JwtAuthenticationFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 }
