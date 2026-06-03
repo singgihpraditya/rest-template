@@ -1,0 +1,1036 @@
+{
+  "info": {
+    "_postman_id": "rest-template-api-collection",
+    "name": "REST Template API",
+    "description": "Postman Collection untuk REST Template API - Spring Boot 3.2 + JWT\n\n**Setup:**\n1. Jalankan aplikasi dengan profile local: `mvn spring-boot:run -Dspring-boot.run.profiles=local`\n2. Import collection ini ke Postman\n3. Jalankan request **Login** di folder Auth - token akan otomatis tersimpan ke variable `token`\n4. Semua request lain sudah dikonfigurasi menggunakan token tersebut\n\n**Default credentials:**\n- Admin: `admin / admin123`\n- User: `user / user123`",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string",
+      "description": "Base URL aplikasi"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string",
+      "description": "JWT token - otomatis terisi setelah request Login"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Endpoint autentikasi: login, register, dan get current user",
+      "item": [
+        {
+          "name": "Login (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    const token = json.output_schema.access_token;",
+                  "    pm.collectionVariables.set('token', token);",
+                  "    console.log('Token tersimpan:', token.substring(0, 30) + '...');",
+                  "}",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Error code RST-000', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.error_schema.error_code).to.eql('RST-000');",
+                  "});",
+                  "pm.test('Token ada', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.output_schema.access_token).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Login sebagai admin. Token JWT akan otomatis tersimpan ke variable `token`."
+          }
+        },
+        {
+          "name": "Login (User)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('token', json.output_schema.access_token);",
+                  "}",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"user\",\n  \"password\": \"user123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Login sebagai regular user."
+          }
+        },
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Error code RST-000', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.error_schema.error_code).to.eql('RST-000');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"newuser\",\n  \"password\": \"newpass123\",\n  \"email\": \"newuser@example.com\",\n  \"fullName\": \"New User\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Daftarkan user baru. Role default: ROLE_USER."
+          }
+        },
+        {
+          "name": "Get Current User (Me)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Username ada', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.output_schema.username).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "Ambil data user yang sedang login. Membutuhkan token JWT."
+          }
+        },
+        {
+          "name": "Login - Validation Error",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error code RST-001', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.error_schema.error_code).to.eql('RST-001');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"\",\n  \"password\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Contoh response validation error (RST-001) saat field kosong."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Category",
+      "description": "CRUD kategori produk. GET bisa tanpa token, POST/PUT/DELETE butuh ROLE_ADMIN.",
+      "item": [
+        {
+          "name": "Get All Categories",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Output schema ada', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.output_schema.content).to.be.an('array');",
+                  "    pm.expect(json.output_schema.total_elements).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/categories?page=0&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "categories"],
+              "query": [
+                { "key": "page", "value": "0", "description": "Nomor halaman (mulai dari 0)" },
+                { "key": "size", "value": "10", "description": "Jumlah item per halaman" },
+                { "key": "search", "value": "", "description": "Keyword pencarian (opsional)", "disabled": true }
+              ]
+            },
+            "description": "Ambil semua kategori dengan pagination. Endpoint publik (tidak butuh token)."
+          }
+        },
+        {
+          "name": "Get All Categories (with Search)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/categories?page=0&size=10&search=elect",
+              "host": ["{{base_url}}"],
+              "path": ["api", "categories"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" },
+                { "key": "search", "value": "elect", "description": "Filter kategori yang mengandung 'elect'" }
+              ]
+            },
+            "description": "Pencarian kategori berdasarkan keyword."
+          }
+        },
+        {
+          "name": "Get Category by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('ID sesuai', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.output_schema.id).to.eql(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/categories/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "categories", "1"]
+            },
+            "description": "Ambil detail satu kategori berdasarkan ID."
+          }
+        },
+        {
+          "name": "Get Category by ID - Not Found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Error code RST-002', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.error_schema.error_code).to.eql('RST-002');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/categories/9999",
+              "host": ["{{base_url}}"],
+              "path": ["api", "categories", "9999"]
+            },
+            "description": "Contoh response not found (RST-002) saat ID tidak ditemukan."
+          }
+        },
+        {
+          "name": "Create Category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Nama sesuai', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.output_schema.name).to.eql('Furniture');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Furniture\",\n  \"description\": \"Perabot dan furnitur rumah tangga\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/categories",
+              "host": ["{{base_url}}"],
+              "path": ["api", "categories"]
+            },
+            "description": "Buat kategori baru. Membutuhkan ROLE_ADMIN. Login sebagai admin terlebih dahulu."
+          }
+        },
+        {
+          "name": "Update Category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Nama terupdate', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.output_schema.name).to.eql('Electronics & Gadgets');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Electronics & Gadgets\",\n  \"description\": \"Produk elektronik dan gadget terkini\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/categories/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "categories", "1"]
+            },
+            "description": "Update kategori berdasarkan ID. Membutuhkan ROLE_ADMIN."
+          }
+        },
+        {
+          "name": "Delete Category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Error code RST-000', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.error_schema.error_code).to.eql('RST-000');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/categories/4",
+              "host": ["{{base_url}}"],
+              "path": ["api", "categories", "4"]
+            },
+            "description": "Hapus kategori berdasarkan ID. Hanya berhasil jika kategori tidak memiliki produk. Membutuhkan ROLE_ADMIN."
+          }
+        },
+        {
+          "name": "Category Stats (Native Query)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Output berupa array', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.output_schema).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/categories/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "categories", "stats"]
+            },
+            "description": "Contoh native query: jumlah produk per kategori menggunakan SQL GROUP BY."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Product",
+      "description": "CRUD produk. GET bisa tanpa token, POST/PUT/DELETE butuh ROLE_ADMIN.",
+      "item": [
+        {
+          "name": "Get All Products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Pagination ada', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.output_schema.content).to.be.an('array');",
+                  "    pm.expect(json.output_schema.total_pages).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products?page=0&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" },
+                { "key": "search", "value": "", "disabled": true, "description": "Filter nama produk" }
+              ]
+            },
+            "description": "Ambil semua produk dengan pagination. Endpoint publik."
+          }
+        },
+        {
+          "name": "Get All Products (with Search)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products?page=0&size=10&search=macbook",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" },
+                { "key": "search", "value": "macbook" }
+              ]
+            },
+            "description": "Pencarian produk berdasarkan keyword nama."
+          }
+        },
+        {
+          "name": "Get Product by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Product ada', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.output_schema.id).to.be.a('number');",
+                  "    pm.expect(json.output_schema.category).to.be.an('object');",
+                  "    pm.expect(json.output_schema.tags).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "1"]
+            },
+            "description": "Ambil detail produk termasuk category dan tags."
+          }
+        },
+        {
+          "name": "Get Products by Category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Semua produk dari kategori yang sama', () => {",
+                  "    const json = pm.response.json();",
+                  "    json.output_schema.content.forEach(p => {",
+                  "        pm.expect(p.category.id).to.eql(1);",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products/category/1?page=0&size=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "category", "1"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "Ambil produk berdasarkan kategori ID. Endpoint publik."
+          }
+        },
+        {
+          "name": "Get Top Products by Price (Native Query)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Max 3 produk', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.output_schema.length).to.be.at.most(3);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products/top?limit=3",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "top"],
+              "query": [
+                { "key": "limit", "value": "3", "description": "Jumlah produk termahal yang diambil" }
+              ]
+            },
+            "description": "Contoh native query: ambil N produk dengan harga tertinggi."
+          }
+        },
+        {
+          "name": "Get Products by Tag (Native Query)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Output berupa array', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.output_schema).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products/tag/apple",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "tag", "apple"]
+            },
+            "description": "Contoh native query dengan JOIN ke tabel product_tags: cari produk berdasarkan nama tag."
+          }
+        },
+        {
+          "name": "Create Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Product terbuat', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.output_schema.name).to.eql('Samsung Galaxy S24');",
+                  "    pm.expect(json.output_schema.category).to.be.an('object');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Samsung Galaxy S24\",\n  \"description\": \"Smartphone Android flagship Samsung terbaru\",\n  \"price\": 15999000,\n  \"stock\": 30,\n  \"published_at\": \"2024-06-01 09:00:00\",\n  \"category_id\": 1,\n  \"tag_ids\": [1]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/products",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products"]
+            },
+            "description": "Buat produk baru. Membutuhkan ROLE_ADMIN. `category_id` wajib diisi, `tag_ids` opsional."
+          }
+        },
+        {
+          "name": "Update Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Stok terupdate', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.output_schema.stock).to.eql(45);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"iPhone 15 Pro\",\n  \"description\": \"Smartphone flagship Apple dengan chip A17 Pro - Updated\",\n  \"price\": 18999000,\n  \"stock\": 45,\n  \"published_at\": \"2023-09-22 09:00:00\",\n  \"category_id\": 1,\n  \"tag_ids\": [1, 3]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/products/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "1"]
+            },
+            "description": "Update data produk. Membutuhkan ROLE_ADMIN."
+          }
+        },
+        {
+          "name": "Delete Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Error code RST-000', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.error_schema.error_code).to.eql('RST-000');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/products/5",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "5"]
+            },
+            "description": "Hapus produk berdasarkan ID. Membutuhkan ROLE_ADMIN."
+          }
+        }
+      ]
+    },
+    {
+      "name": "File Upload",
+      "description": "Upload file ke server dan akses file yang sudah di-upload.",
+      "item": [
+        {
+          "name": "Upload File",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('filename dan file_url ada', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.output_schema.filename).to.be.a('string');",
+                  "    pm.expect(json.output_schema.file_url).to.be.a('string');",
+                  "    pm.collectionVariables.set('uploaded_filename', json.output_schema.filename);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "Pilih file untuk di-upload (max 10MB)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/files/upload",
+              "host": ["{{base_url}}"],
+              "path": ["api", "files", "upload"]
+            },
+            "description": "Upload file ke server. Response berisi nama file unik dan URL akses.\nFile bisa diakses langsung via URL: `{{base_url}}/files/{filename}`"
+          }
+        },
+        {
+          "name": "Download File",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/files/download/{{uploaded_filename}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "files", "download", "{{uploaded_filename}}"]
+            },
+            "description": "Download file berdasarkan nama file yang didapat dari response Upload.\nGanti `{{uploaded_filename}}` dengan nama file aktual jika tidak menggunakan variabel."
+          }
+        },
+        {
+          "name": "Access File via Static URL",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/files/{{uploaded_filename}}",
+              "host": ["{{base_url}}"],
+              "path": ["files", "{{uploaded_filename}}"]
+            },
+            "description": "Akses file yang di-upload langsung sebagai static resource (tanpa auth).\nDikonfigurasi di WebMvcConfig.java."
+          }
+        }
+      ]
+    },
+    {
+      "name": "External API (Feign Client)",
+      "description": "Contoh pemanggilan REST API eksternal menggunakan Spring Cloud OpenFeign.\nMemanggil JSONPlaceholder: https://jsonplaceholder.typicode.com",
+      "item": [
+        {
+          "name": "Get All Posts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Output berupa array', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.output_schema).to.be.an('array');",
+                  "    pm.expect(json.output_schema.length).to.be.above(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/external/posts",
+              "host": ["{{base_url}}"],
+              "path": ["api", "external", "posts"]
+            },
+            "description": "Ambil semua posts dari JSONPlaceholder via Feign Client. Endpoint publik (tidak butuh token)."
+          }
+        },
+        {
+          "name": "Get Post by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Post ID = 1', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.output_schema.id).to.eql(1);",
+                  "    pm.expect(json.output_schema.title).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/external/posts/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "external", "posts", "1"]
+            },
+            "description": "Ambil satu post berdasarkan ID dari JSONPlaceholder."
+          }
+        },
+        {
+          "name": "Get Posts by User ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Posts dari user 1', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.output_schema).to.be.an('array');",
+                  "    json.output_schema.forEach(post => {",
+                  "        pm.expect(post.user_id).to.eql(1);",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/external/posts/user/1",
+              "host": ["{{base_url}}"],
+              "path": ["api", "external", "posts", "user", "1"]
+            },
+            "description": "Ambil semua posts berdasarkan userId dari JSONPlaceholder."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Error Scenarios",
+      "description": "Koleksi request untuk menguji berbagai skenario error dan kode error RST-xxx.",
+      "item": [
+        {
+          "name": "401 - Unauthorized (No Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Error code RST-401', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.error_schema.error_code).to.eql('RST-401');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "Akses endpoint yang butuh token tanpa menyertakan token. Ekspektasi: 401 RST-401."
+          }
+        },
+        {
+          "name": "403 - Forbidden (Wrong Role)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Error code RST-403', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.error_schema.error_code).to.eql('RST-403');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}", "description": "Login sebagai user biasa (bukan admin) sebelum menjalankan request ini" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Category\",\n  \"description\": \"Test\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/categories",
+              "host": ["{{base_url}}"],
+              "path": ["api", "categories"]
+            },
+            "description": "Coba buat kategori menggunakan token user biasa (ROLE_USER). Ekspektasi: 403 RST-403.\n\nSebelum jalankan: Login sebagai user biasa menggunakan request 'Login (User)' di folder Auth."
+          }
+        },
+        {
+          "name": "404 - Resource Not Found",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Error code RST-002', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.error_schema.error_code).to.eql('RST-002');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products/99999",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "99999"]
+            },
+            "description": "Akses produk dengan ID yang tidak ada. Ekspektasi: 404 RST-002."
+          }
+        },
+        {
+          "name": "409 - Business Rule (Duplicate Category)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Error code RST-003', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.error_schema.error_code).to.eql('RST-003');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Electronics\",\n  \"description\": \"Duplikat - sudah ada\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/categories",
+              "host": ["{{base_url}}"],
+              "path": ["api", "categories"]
+            },
+            "description": "Coba buat kategori dengan nama yang sudah ada ('Electronics'). Ekspektasi: 409 RST-003.\n\nLogin sebagai admin terlebih dahulu."
+          }
+        }
+      ]
+    }
+  ]
+}
