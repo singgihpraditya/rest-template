@@ -195,6 +195,9 @@ public class DataInitializer implements CommandLineRunner {
             {  30, "*",      "/api/files/**",             "ROLE_USER",   "Upload/download file" },
             {  31, "GET",    "/api/auth/me",              "ROLE_USER",   "Get current user info" },
 
+            // --- Diagnostic (publik, untuk verifikasi tracing) ---
+            {  13, "GET",    "/api/diagnostic/**",         null,          "Endpoint verifikasi tracing (publik)" },
+
             // --- Default fallback: wajib login ---
             { 999, "*",      "/api/**",                   "ROLE_USER",   "Default: semua /api/** wajib login" },
         };

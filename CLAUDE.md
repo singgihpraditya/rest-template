@@ -561,6 +561,33 @@ JWT_SECRET=...
 - Log startup/background menampilkan `traceId=NO_TRACE` (tidak ada HTTP request aktif)
 - File log: `logs/app.log`, rotate harian + 10MB, history 30 hari
 
+### Verifikasi Tracing Berjalan
+
+**Cara 1 — Log (tanpa setup tambahan):**
+```
+# Hit sembarang endpoint, lalu cek log
+GET /api/categories
+→ Log harus mengandung: traceId=4bf92f3577b34da6a3ce929d0e0e4736 (hex 32 char)
+→ Jika masih traceId=NO_TRACE → ada masalah
+```
+
+**Cara 2 — Endpoint diagnostik (tanpa setup tambahan):**
+```
+GET /api/diagnostic/trace
+→ status: "OK", trace_id: "4bf92f3577b34da6a3ce929d0e0e4736"
+→ mdc_trace_id harus sama dengan trace_id
+```
+
+**Cara 3 — Jaeger UI (visual, butuh Docker):**
+```bash
+# 1. Uncomment di pom.xml: opentelemetry-exporter-otlp
+# 2. Uncomment di application-local.properties:
+#    management.otlp.tracing.endpoint=http://localhost:4318/v1/traces
+# 3. Jalankan Jaeger
+docker-compose up -d
+# 4. Buka http://localhost:16686 → pilih service "rest-template"
+```
+
 ---
 
 ## 10. Data Default (Profile Local)
