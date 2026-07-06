@@ -12,6 +12,7 @@ import com.example.template.repository.ProductRepository;
 import com.example.template.repository.TagRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -23,6 +24,8 @@ import org.springframework.util.StringUtils;
 import java.util.List;
 import java.util.Set;
 
+import static com.example.template.config.CacheConfig.CATEGORIES_WITH_PRODUCT_COUNT_CACHE;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -33,6 +36,7 @@ public class ProductService {
     private final TagRepository tagRepository;
 
     @Transactional
+    @CacheEvict(value = CATEGORIES_WITH_PRODUCT_COUNT_CACHE, allEntries = true)
     public ProductResponse create(ProductRequest request) {
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Category", request.getCategoryId()));
@@ -91,6 +95,7 @@ public class ProductService {
     }
 
     @Transactional
+    @CacheEvict(value = CATEGORIES_WITH_PRODUCT_COUNT_CACHE, allEntries = true)
     public ProductResponse update(Long id, ProductRequest request) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", id));
@@ -115,6 +120,7 @@ public class ProductService {
     }
 
     @Transactional
+    @CacheEvict(value = CATEGORIES_WITH_PRODUCT_COUNT_CACHE, allEntries = true)
     public void delete(Long id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", id));

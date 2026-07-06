@@ -75,6 +75,12 @@
             <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
 
+        <!-- Spring Cache (in-memory) untuk cache hasil query yang jarang berubah -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
+        </dependency>
+
         <!-- Actuator: diperlukan oleh Micrometer Tracing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
