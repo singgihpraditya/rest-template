@@ -7,6 +7,7 @@ import com.example.template.entity.Category;
 import com.example.template.exception.BusinessException;
 import com.example.template.exception.ResourceNotFoundException;
 import com.example.template.repository.CategoryRepository;
+import com.example.template.repository.projection.CategoryProductCountProjection;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -102,13 +103,13 @@ public class CategoryService {
      */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getCategoriesWithProductCount() {
-        List<Object[]> rawResults = categoryRepository.findCategoriesWithProductCount();
+        List<CategoryProductCountProjection> results = categoryRepository.findCategoriesWithProductCount();
 
-        return rawResults.stream().map(row -> Map.of(
-                "id", row[0],
-                "name", row[1],
-                "description", row[2] != null ? row[2] : "",
-                "product_count", row[3]
+        return results.stream().map(row -> Map.of(
+                "id", row.getId(),
+                "name", row.getName(),
+                "description", row.getDescription() != null ? row.getDescription() : "",
+                "product_count", row.getProductCount()
         )).toList();
     }
 }
