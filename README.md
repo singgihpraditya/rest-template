@@ -1,8 +1,5 @@
 # REST Template — Panduan Developer
 
-Kamu adalah senior Java developer. Dokumen ini adalah **sumber tunggal kebenaran** untuk project ini.
-Baca seluruh dokumen sebelum membuat atau mengubah kode.
-
 ---
 
 ## 1. Tech Stack & Versi
