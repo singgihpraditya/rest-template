@@ -30,15 +30,18 @@ com.example.template/
 ├── aspect/
 │   └── LoggingAspect.java          ← AOP: log entry/exit/durasi semua method controller
 ├── config/
+│   ├── CacheConfig.java             ← Konstanta nama cache (CATEGORIES_WITH_PRODUCT_COUNT_CACHE)
 │   ├── DataInitializer.java         ← Seed data awal (hanya profile local)
 │   ├── JacksonConfig.java           ← Global: snake_case + format LocalDateTime
 │   ├── OpenApiConfig.java           ← Swagger UI + JWT auth schema
 │   ├── SecurityConfig.java          ← Spring Security + DynamicAuthorizationManager
-│   ├── TraceIdLoggingFilter.java    ← Isi traceId ke MDC setiap HTTP request
+│   ├── TraceIdLoggingFilter.java    ← Isi traceId + requestId ke MDC setiap HTTP request
 │   └── WebMvcConfig.java            ← Static resource handler untuk /files/**
 ├── controller/
 │   ├── AuthController.java          ← POST /api/auth/login, register, GET /api/auth/me
-│   ├── CategoryController.java      ← CRUD /api/categories
+│   ├── CacheController.java         ← POST /api/cache/cleanup (ADMIN) — bersihkan semua cache
+│   ├── CategoryController.java      ← CRUD /api/categories + GET /api/categories/stats
+│   ├── DiagnosticController.java    ← GET /api/diagnostic/trace — verifikasi OTel tracing
 │   ├── EndpointPermissionController.java ← CRUD /api/permissions (ADMIN)
 │   ├── ExternalApiController.java   ← GET /api/external/** (demo Feign)
 │   ├── FileController.java          ← POST /api/files/upload, GET /api/files/download/**
@@ -77,7 +80,9 @@ com.example.template/
 ├── feign/
 │   └── JsonPlaceholderClient.java   ← @FeignClient ke jsonplaceholder.typicode.com
 ├── repository/
-│   ├── CategoryRepository.java      ← Contoh: native query GROUP BY
+│   ├── projection/
+│   │   └── CategoryProductCountProjection.java ← Interface projection untuk query native (id, name, description, productCount)
+│   ├── CategoryRepository.java      ← Contoh: native query GROUP BY, dikembalikan sebagai Projection
 │   ├── EndpointPermissionRepository.java
 │   ├── ProductRepository.java       ← Contoh: native query JOIN, LIMIT
 │   ├── RoleRepository.java
@@ -173,6 +178,21 @@ public interface NamaRepository extends JpaRepository<Nama, Long> {
 
 - Extend `JpaRepository<Entity, Long>`
 - JPQL untuk query sederhana, native query untuk JOIN kompleks / SQL spesifik DB
+
+**Native Query dengan Projection (WAJIB — bukan `List<Object[]>`):**
+```java
+// Buat interface projection di package repository/projection/
+public interface NamaProjection {
+    Long getId();
+    String getName();
+    Long getCount();
+}
+
+// Repository: return type pakai projection, BUKAN Object[]
+@Query(value = "SELECT id, name, COUNT(*) AS count FROM ...", nativeQuery = true)
+List<NamaProjection> findWithCount();
+```
+Gunakan projection (bukan `List<Object[]>`) untuk native query agar type-safe dan mudah di-test.
 
 ---
 
@@ -424,8 +444,10 @@ Authorization: Bearer <admin-token>
 | 10 | `GET` | `/api/products/**` | - | Publik |
 | 11 | `GET` | `/api/categories/**` | - | Publik |
 | 12 | `GET` | `/api/external/**` | - | Publik |
+| 13 | `GET` | `/api/diagnostic/**` | - | Publik (diagnostic) |
 | 20-25 | `POST/PUT/DELETE` | `/api/categories/**`, `/api/products/**` | ROLE_ADMIN | Admin only |
 | 26 | `*` | `/api/permissions/**` | ROLE_ADMIN | Kelola permission |
+| 27 | `*` | `/api/cache/**` | ROLE_ADMIN | Cache management |
 | 30 | `*` | `/api/files/**` | ROLE_USER | Upload file |
 | 999 | `*` | `/api/**` | ROLE_USER | Default fallback |
 
@@ -556,10 +578,25 @@ JWT_SECRET=...
 ## 9. Logging & Tracing
 
 - **`LoggingAspect`**: log otomatis `[ENTRY]`, `[EXIT]`, durasi untuk semua method controller
-- **`TraceIdLoggingFilter`**: isi `traceId` + `spanId` ke MDC setiap HTTP request
-- **Log pattern:** `timestamp | level | thread | logger | traceId=... | pesan`
-- Log startup/background menampilkan `traceId=NO_TRACE` (tidak ada HTTP request aktif)
+- **`TraceIdLoggingFilter`**: isi `traceId`, `spanId`, dan `requestId` ke MDC setiap HTTP request
+- **Log pattern:** `timestamp | level | thread | logger | traceId=... | requestId=... | pesan`
+- Log startup/background menampilkan `traceId=NO_TRACE | requestId=NO_REQ` (tidak ada HTTP request aktif)
 - File log: `logs/app.log`, rotate harian + 10MB, history 30 hari
+
+### traceId vs requestId
+
+| | `traceId` | `requestId` |
+|---|---|---|
+| Dibuat oleh | Micrometer (server, otomatis) | Client via header, atau UUID otomatis |
+| Dikontrol client? | Tidak | Ya, via header `X-Request-Id` |
+| Tujuan | Debug distributed tracing lintas service (Jaeger) | Korelasi log antara client dan server |
+| Format | Hex 32 karakter (W3C standard) | Bebas — UUID, sequence number, dll. |
+
+**Cara kirim requestId dari Postman / UI:**
+```
+Header: X-Request-Id: checkout-retry-3
+```
+Jika header tidak dikirim, server generate UUID otomatis. Nilai requestId selalu dikembalikan di response header `X-Request-Id`.
 
 ### Verifikasi Tracing Berjalan
 
@@ -567,8 +604,10 @@ JWT_SECRET=...
 ```
 # Hit sembarang endpoint, lalu cek log
 GET /api/categories
-→ Log harus mengandung: traceId=4bf92f3577b34da6a3ce929d0e0e4736 (hex 32 char)
-→ Jika masih traceId=NO_TRACE → ada masalah
+→ Log harus mengandung:
+  traceId=4bf92f3577b34da6a3ce929d0e0e4736 (hex 32 char)
+  requestId=550e8400-e29b-41d4-a716-446655440000 (UUID atau nilai dari header)
+→ Jika masih traceId=NO_TRACE → ada masalah dengan Micrometer
 ```
 
 **Cara 2 — Endpoint diagnostik (tanpa setup tambahan):**
@@ -608,13 +647,14 @@ Dibuat otomatis oleh `DataInitializer.java` saat startup:
 
 | File | Fungsi |
 |------|--------|
-| `pom.xml` | Dependencies Maven |
+| `pom.xml` | Dependencies Maven + JaCoCo coverage plugin |
 | `src/main/resources/application.properties` | Base config (semua profile) |
 | `src/main/resources/application-local.properties` | Config H2, dev tools |
 | `src/main/resources/application-dev.properties` | Config PostgreSQL dev |
 | `src/main/resources/application-prod.properties` | Config PostgreSQL prod |
 | `src/main/resources/log4j2.xml` | Konfigurasi Log4j2 |
 | `rest-template.postman_collection.json` | Postman collection semua endpoint |
+| `target/site/jacoco/index.html` | Laporan coverage JaCoCo (dibuat setelah `mvn verify`) |
 
 **Cara menjalankan:**
 ```bash
@@ -626,6 +666,18 @@ http://localhost:8080/swagger-ui.html
 
 # H2 Console (local only)
 http://localhost:8080/h2-console  (JDBC URL: jdbc:h2:mem:logitrackdb)
+```
+
+**Menjalankan unit test dan laporan coverage:**
+```bash
+# Jalankan semua test + generate laporan JaCoCo
+mvn test -Dspring.profiles.active=local
+
+# Verifikasi coverage 100% pada controller & service (build gagal jika tidak terpenuhi)
+mvn verify -Dspring.profiles.active=local
+
+# Buka laporan HTML coverage
+target/site/jacoco/index.html
 ```
 
 ---
@@ -640,3 +692,127 @@ http://localhost:8080/h2-console  (JDBC URL: jdbc:h2:mem:logitrackdb)
 6. **Lempar exception yang benar:** `ResourceNotFoundException` untuk 404, `BusinessException` untuk 409
 7. **Format timestamp** input/output: `"yyyy-MM-dd HH:mm:ss"` — bukan ISO-8601
 8. **Nama file Java harus sama persis** dengan nama class public di dalamnya
+9. **Native query WAJIB pakai Projection** — bukan `List<Object[]>`. Buat interface di `repository/projection/`
+10. **Nama cache WAJIB pakai konstanta** dari `CacheConfig` — bukan string literal langsung di `@Cacheable`
+
+---
+
+## 13. Unit Testing
+
+### Strategi
+- **Framework:** JUnit 5 + Mockito (`@ExtendWith(MockitoExtension.class)`)
+- **Pendekatan:** Pure unit test — mock semua dependency, **tidak** start Spring context
+- **Target coverage:** 100% instruction, method, dan branch pada package `controller` dan `service`
+- **Enforced oleh:** JaCoCo `check` goal saat `mvn verify`
+
+### Struktur Test
+
+```
+src/test/java/com/example/template/
+├── controller/
+│   ├── AuthControllerTest.java
+│   ├── CacheControllerTest.java
+│   ├── CategoryControllerTest.java
+│   ├── DiagnosticControllerTest.java
+│   ├── EndpointPermissionControllerTest.java
+│   ├── ExternalApiControllerTest.java
+│   ├── FileControllerTest.java
+│   └── ProductControllerTest.java
+└── service/
+    ├── AuthServiceTest.java
+    ├── CategoryServiceTest.java
+    ├── EndpointPermissionServiceTest.java
+    ├── ExternalApiServiceTest.java
+    ├── FileStorageServiceTest.java
+    └── ProductServiceTest.java
+```
+
+### Pola Penulisan Test
+
+**1. Setup dasar (semua test class):**
+```java
+@ExtendWith(MockitoExtension.class)
+class NamaServiceTest {
+    @Mock private NamaRepository namaRepository;
+    @InjectMocks private NamaService namaService;
+}
+```
+
+**2. Set field pada Request DTO** (karena hanya punya `@NoArgsConstructor`, tanpa setter/builder):
+```java
+NamaRequest request = new NamaRequest();
+ReflectionTestUtils.setField(request, "name", "nilai");
+ReflectionTestUtils.setField(request, "namaId", 1L);
+```
+
+**3. Set `@Value` field pada Service:**
+```java
+// Wajib dilakukan di @BeforeEach untuk service yang punya @Value
+ReflectionTestUtils.setField(authService, "jwtExpiration", 600000L);
+```
+
+**4. Controller dengan `@AuthenticationPrincipal`** — langsung pass mock UserDetails:
+```java
+UserDetails mockUserDetails = mock(UserDetails.class);
+when(mockUserDetails.getUsername()).thenReturn("admin");
+controller.getCurrentUser(mockUserDetails);
+```
+
+**5. Controller dengan `ServletUriComponentsBuilder`** (FileController) — setup RequestContextHolder:
+```java
+@BeforeEach
+void setUp() {
+    MockHttpServletRequest req = new MockHttpServletRequest();
+    req.setScheme("http"); req.setServerName("localhost"); req.setServerPort(8080);
+    RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(req));
+}
+@AfterEach void tearDown() { RequestContextHolder.resetRequestAttributes(); }
+```
+
+**6. Service dengan `@PostConstruct`** — `@PostConstruct` TIDAK dipanggil oleh Mockito.
+Panggil manual jika diperlukan, atau set field via `ReflectionTestUtils`:
+```java
+// FileStorageService: panggil init() manual setelah set uploadDir
+ReflectionTestUtils.setField(service, "uploadDir", tempDir.toString());
+service.init();
+
+// EndpointPermissionService: cache permissionCache mulai kosong → otomatis test lazy-load
+```
+
+**7. Mock static method** (misal `Files.createDirectories`):
+```java
+try (MockedStatic<Files> mockFiles = mockStatic(Files.class)) {
+    mockFiles.when(() -> Files.createDirectories(any())).thenThrow(new IOException());
+    assertThrows(RuntimeException.class, service::init);
+}
+```
+
+**8. Mock konstruktor** (misal `new UrlResource(...)`):
+```java
+try (MockedConstruction<UrlResource> mocked = mockConstruction(UrlResource.class,
+        (mock, context) -> {
+            when(mock.exists()).thenReturn(true);
+            when(mock.isReadable()).thenReturn(false);
+        })) {
+    assertThrows(ResourceNotFoundException.class, () -> service.loadFileAsResource("file.txt"));
+}
+```
+
+**9. Test cache in-memory** (`EndpointPermissionService.permissionCache`):
+```java
+// Pre-populate cache untuk test "cache hit"
+ReflectionTestUtils.setField(service, "permissionCache", List.of(permission));
+
+// Biarkan cache kosong untuk test lazy-load (Mockito tidak panggil @PostConstruct)
+when(repository.findAllByActiveTrueOrderBySortOrderAsc()).thenReturn(List.of(perm));
+service.findMatchingPermission("GET", "/api/test"); // otomatis memanggil refresh()
+```
+
+### Aturan Coverage 100%
+
+Semua branch harus dicover, termasuk:
+- Setiap `if/else` → test satu untuk tiap kondisi
+- `try/catch` → test happy path DAN exception path
+- Compound condition (`&&`, `||`) → test short-circuit evaluation
+- Lambdas di `orElseThrow()` → test kondisi empty Optional
+- Loop kosong vs loop berisi (untuk `CacheController`)

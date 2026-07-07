@@ -190,6 +190,7 @@ public class DataInitializer implements CommandLineRunner {
             {  24, "PUT",    "/api/products/**",          "ROLE_ADMIN",  "Update produk" },
             {  25, "DELETE", "/api/products/**",          "ROLE_ADMIN",  "Hapus produk" },
             {  26, "*",      "/api/permissions/**",       "ROLE_ADMIN",  "Kelola permission (ADMIN)" },
+            {  27, "*",      "/api/cache/**",             "ROLE_ADMIN",  "Kelola cache (ADMIN)" },
 
             // --- User yang sudah login (role apapun) ---
             {  30, "*",      "/api/files/**",             "ROLE_USER",   "Upload/download file" },

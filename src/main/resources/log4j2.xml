@@ -3,12 +3,12 @@
 
     <Properties>
         <!--
-            Format: timestamp | level | thread | logger | traceId | pesan
-            %X{traceId:-NO_TRACE} → tampilkan "NO_TRACE" jika traceId tidak ada di MDC.
-            traceId hanya terisi pada log yang berasal dari HTTP request (diisi oleh TraceIdLoggingFilter).
-            Log saat startup atau background job tidak punya traceId aktif.
+            Format: timestamp | level | thread | logger | traceId | requestId | pesan
+            %X{traceId:-NO_TRACE}   → "NO_TRACE" jika tidak ada HTTP request aktif (startup/background).
+            %X{requestId:-NO_REQ}   → "NO_REQ" jika tidak ada HTTP request aktif.
+            requestId diambil dari header X-Request-Id (client) atau di-generate UUID otomatis.
         -->
-        <Property name="LOG_PATTERN">%d{yyyy-MM-dd HH:mm:ss.SSS} | %-5level | %thread | %logger{36} | traceId=%X{traceId:-NO_TRACE} | %msg%n</Property>
+        <Property name="LOG_PATTERN">%d{yyyy-MM-dd HH:mm:ss.SSS} | %-5level | %thread | %logger{36} | traceId=%X{traceId:-NO_TRACE} | requestId=%X{requestId:-NO_REQ} | %msg%n</Property>
         <Property name="LOG_FILE">logs/app.log</Property>
         <Property name="LOG_ARCHIVE">logs/app-%d{yyyy-MM-dd}-%i.log.gz</Property>
     </Properties>

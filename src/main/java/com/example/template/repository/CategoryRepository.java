@@ -1,6 +1,7 @@
 package com.example.template.repository;
 
 import com.example.template.entity.Category;
+import com.example.template.repository.projection.CategoryProductCountProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -28,7 +29,7 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
             GROUP BY c.id, c.name, c.description
             ORDER BY product_count DESC
             """, nativeQuery = true)
-    List<Object[]> findCategoriesWithProductCount();
+    List<CategoryProductCountProjection> findCategoriesWithProductCount();
 
     // --- Native Query #2 ---
     // Cari kategori berdasarkan keyword menggunakan native SQL LIKE

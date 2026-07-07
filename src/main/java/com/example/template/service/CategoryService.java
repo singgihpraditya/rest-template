@@ -7,8 +7,11 @@ import com.example.template.entity.Category;
 import com.example.template.exception.BusinessException;
 import com.example.template.exception.ResourceNotFoundException;
 import com.example.template.repository.CategoryRepository;
+import com.example.template.repository.projection.CategoryProductCountProjection;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -17,6 +20,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import static com.example.template.config.CacheConfig.CATEGORIES_WITH_PRODUCT_COUNT_CACHE;
+
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -28,6 +34,7 @@ public class CategoryService {
     private final CategoryRepository categoryRepository;
 
     @Transactional
+    @CacheEvict(value = CATEGORIES_WITH_PRODUCT_COUNT_CACHE, allEntries = true)
     public CategoryResponse create(CategoryRequest request) {
         if (categoryRepository.existsByName(request.getName())) {
             throw new BusinessException("Kategori dengan nama '" + request.getName() + "' sudah ada");
@@ -66,6 +73,7 @@ public class CategoryService {
     }
 
     @Transactional
+    @CacheEvict(value = CATEGORIES_WITH_PRODUCT_COUNT_CACHE, allEntries = true)
     public CategoryResponse update(Long id, CategoryRequest request) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", id));
@@ -84,6 +92,7 @@ public class CategoryService {
     }
 
     @Transactional
+    @CacheEvict(value = CATEGORIES_WITH_PRODUCT_COUNT_CACHE, allEntries = true)
     public void delete(Long id) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Category", id));
@@ -101,14 +110,17 @@ public class CategoryService {
      * Mendapatkan kategori beserta jumlah produk masing-masing.
      */
     @Transactional(readOnly = true)
+    @Cacheable(CATEGORIES_WITH_PRODUCT_COUNT_CACHE)
     public List<Map<String, Object>> getCategoriesWithProductCount() {
-        List<Object[]> rawResults = categoryRepository.findCategoriesWithProductCount();
+        List<CategoryProductCountProjection> results = categoryRepository.findCategoriesWithProductCount();
 
-        return rawResults.stream().map(row -> Map.of(
-                "id", row[0],
-                "name", row[1],
-                "description", row[2] != null ? row[2] : "",
-                "product_count", row[3]
-        )).toList();
+        return results.stream().<Map<String, Object>>map(row -> {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put("id", row.getId());
+            map.put("name", row.getName());
+            map.put("description", row.getDescription() != null ? row.getDescription() : "");
+            map.put("product_count", row.getProductCount());
+            return map;
+        }).toList();
     }
 }
