@@ -1150,6 +1150,87 @@
       ]
     },
     {
+      "name": "Diagnostic",
+      "description": "Endpoint untuk verifikasi OpenTelemetry distributed tracing.\nAkses publik — tidak butuh token.",
+      "item": [
+        {
+          "name": "Check Trace Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Status field ada', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('status');",
+                  "    console.log('Trace status:', json.status);",
+                  "    console.log('Trace ID:', json.trace_id);",
+                  "});",
+                  "pm.test('mdc_trace_id ada', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('mdc_trace_id');",
+                  "});",
+                  "pm.test('message ada', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.message).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/diagnostic/trace",
+              "host": ["{{base_url}}"],
+              "path": ["api", "diagnostic", "trace"]
+            },
+            "description": "Verifikasi bahwa OpenTelemetry tracing berjalan dengan benar.\n\nResponse berisi:\n- `trace_id`: hex string 32 karakter (jika tracing aktif)\n- `span_id`: hex string 16 karakter (jika tracing aktif)\n- `mdc_trace_id`: traceId dari MDC — harus sama dengan trace_id\n- `status`: 'OK' jika tracing aktif, 'NOT_ACTIVE' jika tidak\n\nJika status 'NOT_ACTIVE', pastikan `micrometer-tracing-bridge-otel` ada di classpath.\nEndpoint publik — tidak butuh token."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cache Management",
+      "description": "Kelola application cache (Spring Cache + Caffeine).\nSemua request membutuhkan token ROLE_ADMIN.",
+      "item": [
+        {
+          "name": "Cleanup All Cache",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Error code RST-000', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.error_schema.error_code).to.eql('RST-000');",
+                  "    console.log('Semua cache berhasil dibersihkan');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/cache/cleanup",
+              "host": ["{{base_url}}"],
+              "path": ["api", "cache", "cleanup"]
+            },
+            "description": "Bersihkan semua application cache secara paksa.\n\nCache yang dibersihkan:\n- `categoriesWithProductCount` — hasil native query GROUP BY dari CategoryService\n\nKapan digunakan:\n- Setelah perubahan data langsung di DB (bukan via API)\n- Jika ada inkonsistensi antara data DB dan data yang dikembalikan API\n- Testing / debugging\n\nMembutuhkan ROLE_ADMIN. Login sebagai admin terlebih dahulu."
+          }
+        }
+      ]
+    },
+    {
       "name": "Error Scenarios",
       "description": "Koleksi request untuk menguji berbagai skenario error dan kode error RST-xxx.",
       "item": [
