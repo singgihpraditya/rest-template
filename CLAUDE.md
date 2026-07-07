@@ -35,7 +35,7 @@ com.example.template/
 │   ├── JacksonConfig.java           ← Global: snake_case + format LocalDateTime
 │   ├── OpenApiConfig.java           ← Swagger UI + JWT auth schema
 │   ├── SecurityConfig.java          ← Spring Security + DynamicAuthorizationManager
-│   ├── TraceIdLoggingFilter.java    ← Isi traceId ke MDC setiap HTTP request
+│   ├── TraceIdLoggingFilter.java    ← Isi traceId + requestId ke MDC setiap HTTP request
 │   └── WebMvcConfig.java            ← Static resource handler untuk /files/**
 ├── controller/
 │   ├── AuthController.java          ← POST /api/auth/login, register, GET /api/auth/me
@@ -578,10 +578,25 @@ JWT_SECRET=...
 ## 9. Logging & Tracing
 
 - **`LoggingAspect`**: log otomatis `[ENTRY]`, `[EXIT]`, durasi untuk semua method controller
-- **`TraceIdLoggingFilter`**: isi `traceId` + `spanId` ke MDC setiap HTTP request
-- **Log pattern:** `timestamp | level | thread | logger | traceId=... | pesan`
-- Log startup/background menampilkan `traceId=NO_TRACE` (tidak ada HTTP request aktif)
+- **`TraceIdLoggingFilter`**: isi `traceId`, `spanId`, dan `requestId` ke MDC setiap HTTP request
+- **Log pattern:** `timestamp | level | thread | logger | traceId=... | requestId=... | pesan`
+- Log startup/background menampilkan `traceId=NO_TRACE | requestId=NO_REQ` (tidak ada HTTP request aktif)
 - File log: `logs/app.log`, rotate harian + 10MB, history 30 hari
+
+### traceId vs requestId
+
+| | `traceId` | `requestId` |
+|---|---|---|
+| Dibuat oleh | Micrometer (server, otomatis) | Client via header, atau UUID otomatis |
+| Dikontrol client? | Tidak | Ya, via header `X-Request-Id` |
+| Tujuan | Debug distributed tracing lintas service (Jaeger) | Korelasi log antara client dan server |
+| Format | Hex 32 karakter (W3C standard) | Bebas — UUID, sequence number, dll. |
+
+**Cara kirim requestId dari Postman / UI:**
+```
+Header: X-Request-Id: checkout-retry-3
+```
+Jika header tidak dikirim, server generate UUID otomatis. Nilai requestId selalu dikembalikan di response header `X-Request-Id`.
 
 ### Verifikasi Tracing Berjalan
 
@@ -589,8 +604,10 @@ JWT_SECRET=...
 ```
 # Hit sembarang endpoint, lalu cek log
 GET /api/categories
-→ Log harus mengandung: traceId=4bf92f3577b34da6a3ce929d0e0e4736 (hex 32 char)
-→ Jika masih traceId=NO_TRACE → ada masalah
+→ Log harus mengandung:
+  traceId=4bf92f3577b34da6a3ce929d0e0e4736 (hex 32 char)
+  requestId=550e8400-e29b-41d4-a716-446655440000 (UUID atau nilai dari header)
+→ Jika masih traceId=NO_TRACE → ada masalah dengan Micrometer
 ```
 
 **Cara 2 — Endpoint diagnostik (tanpa setup tambahan):**
